@@ -2,7 +2,6 @@ import duckdb
 from sling import Replication, ReplicationStream, Mode
 import pyarrow.parquet as pq
 from pyarrow.fs import LocalFileSystem, FileSelector, FileType
-from itertools import cycle
 
 # synthetic data
 DATA_QUERY = """
@@ -54,49 +53,30 @@ def create_data():
 
 
 def check_data():
-    FILE = "data"
-
-    duckdb_files = cycle(
-        [
-            info
-            for info in (
-                LocalFileSystem().get_file_info(
-                    FileSelector("duckdb_partitioned", recursive=True)
-                )
-            )
-            if info.type == FileType.File
-        ]
+    duckdb_files = filter(
+        lambda info: info.type == FileType.File,
+        LocalFileSystem().get_file_info(
+            FileSelector("duckdb_partitioned", recursive=True)
+        ),
     )
-    sling_files = cycle(
-        [
-            info
-            for info in (
-                LocalFileSystem().get_file_info(
-                    FileSelector("sling_partitioned", recursive=True)
-                )
-            )
-            if info.type == FileType.File
-        ]
+    sling_files = filter(
+        lambda info: info.type == FileType.File,
+        LocalFileSystem().get_file_info(
+            FileSelector("sling_partitioned", recursive=True)
+        ),
     )
 
     while True:
-        duckdb_parquet = pq.ParquetFile(next(duckdb_files).path)
-        sling_parquet = pq.ParquetFile(next(sling_files).path)
-
         try:
-            assert duckdb_parquet.schema.equals(sling_parquet.schema)
-        except AssertionError:
-            print(duckdb_parquet.schema, sling_parquet.schema)
+            duckdb_parquet = pq.ParquetFile(next(duckdb_files).path)
+            sling_parquet = pq.ParquetFile(next(sling_files).path)
 
-    # for info in file_infos:
-    #     if :
-    #         print(info.path)
-    #         pf = pq.ParquetFile(info.path)
-    #         schema = pf.schema
-    #         print(schema)
-    #         s = schema.to_arrow_schema()
-
-    #         break
+            try:
+                assert duckdb_parquet.schema.equals(sling_parquet.schema)
+            except AssertionError:
+                print(duckdb_parquet.schema, sling_parquet.schema)
+        except StopIteration:
+            break
 
 
 if __name__ == "__main__":
