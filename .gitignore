@@ -1,0 +1,3 @@
+*.parquet
+.python-version
+.venv
